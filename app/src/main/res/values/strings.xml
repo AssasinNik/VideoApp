@@ -1,3 +1,9 @@
 <resources>
+    <string name="error_disk_full">Не хватает свободного места</string>
+    <string name="error_unknown">Неизвестная ошибка</string>
+    <string name="error_request_timeout">Время ожидания ответа вышло</string>
+    <string name="error_too_many_requests">Слишком много запросов</string>
+    <string name="error_no_internet">Отсутствует подключение к интернету</string>
+    <string name="error_serialization">Ошибка в обработке данных</string>
     <string name="app_name">VideoApp</string>
 </resources>

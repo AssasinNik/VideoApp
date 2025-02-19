@@ -65,4 +65,11 @@ dependencies {
     implementation (libs.accompanist.coil)
 
     implementation(libs.androidx.core.splashscreen)
+
+    implementation ("androidx.compose.animation:animation:1.7.8")
+    implementation ("androidx.media3:media3-exoplayer:1.5.1")
+    implementation ("androidx.media3:media3-ui:1.5.1")
+    implementation ("androidx.compose.material3:material3:1.3.1")
+    implementation ("androidx.compose.foundation:foundation:1.7.8")
+
 }

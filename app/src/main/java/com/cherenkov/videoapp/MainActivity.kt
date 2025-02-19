@@ -4,16 +4,16 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
 import com.cherenkov.videoapp.ui.theme.VideoAppTheme
+import com.cherenkov.videoapp.videoapp.presentation.list_videos.VideoListScreen
+import com.cherenkov.videoapp.videoapp.presentation.list_videos.VideoListScreenRoot
+import com.cherenkov.videoapp.videoapp.presentation.list_videos.VideoListViewModel
+import com.cherenkov.videoapp.videoapp.presentation.player.PlayerScreen
+import org.koin.androidx.compose.koinViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -21,31 +21,17 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             VideoAppTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                        Greeting(
-                            name = "Android",
-                            modifier = Modifier.padding(innerPadding)
-                        )
-                    }
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    val viewModel = koinViewModel<VideoListViewModel>()
+                    VideoListScreenRoot(
+                        viewModel = viewModel,
+                        onVideoClick = {  }
+                    )
                 }
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    VideoAppTheme {
-        Greeting("Android")
     }
 }
