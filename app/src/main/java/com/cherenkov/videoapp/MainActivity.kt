@@ -99,6 +99,12 @@ class MainActivity : ComponentActivity() {
                                     viewModel = viewModel,
                                     onBackClick = {
                                         navController.popBackStack()
+                                    },
+                                    onVideoClick = { video ->
+                                        selectedVideoViewModel.onSelectVideo(video)
+                                        navController.navigate(
+                                            Route.PlayerScreen(video)
+                                        )
                                     }
                                 )
                             }
