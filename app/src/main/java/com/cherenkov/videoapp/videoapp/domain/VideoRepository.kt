@@ -14,5 +14,5 @@ interface VideoRepository {
 
     suspend fun getPopularVideos(): Result<List<VideoItem>, DataError.Remote>
 
-    suspend fun getInfoVideo(id: String): Result<VideoInfo, DataError.Remote>
+    suspend fun getInfoVideo(id: Int): Result<VideoInfo, DataError.Remote>
 }

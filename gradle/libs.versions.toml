@@ -13,12 +13,14 @@ coreSplashscreen = "1.0.1"
 desugar-jdk-libs = "2.1.2"
 ktor = "2.3.12"
 koin = "3.5.6"
+navigationCompose = "2.8.0-alpha10"
 material3-adaptive = "1.0.0"
 compose-material-icons-extended = "1.7.2"
 coilCompose = "2.4.0"
 
 
 [libraries]
+jetbrains-compose-navigation = { group = "org.jetbrains.androidx.navigation", name = "navigation-compose", version.ref =  "navigationCompose" }
 accompanist-coil = { module = "com.google.accompanist:accompanist-coil", version.ref = "accompanistCoil" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-core-splashscreen = { module = "androidx.core:core-splashscreen", version.ref = "coreSplashscreen" }

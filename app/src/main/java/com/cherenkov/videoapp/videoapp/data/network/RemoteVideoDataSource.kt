@@ -11,5 +11,5 @@ interface RemoteVideoDataSource {
 
     suspend fun getPopularVideos(): Result<TopVideosDTO, DataError.Remote>
 
-    suspend fun getInfoVideo(id: String): Result<InfoVideoDTO, DataError.Remote>
+    suspend fun getInfoVideo(id: Int): Result<InfoVideoDTO, DataError.Remote>
 }

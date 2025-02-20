@@ -16,7 +16,7 @@ private const val BASE_URL = "https://api.pexels.com"
 class KtorRemoteVideoDataSource(
     private val httpClient: HttpClient
 ) : RemoteVideoDataSource {
-    override suspend fun getInfoVideo(id: String): Result<InfoVideoDTO, DataError.Remote> {
+    override suspend fun getInfoVideo(id: Int): Result<InfoVideoDTO, DataError.Remote> {
         return safeCall{
             httpClient.get(
                 urlString = "$BASE_URL/videos/videos/${id}"

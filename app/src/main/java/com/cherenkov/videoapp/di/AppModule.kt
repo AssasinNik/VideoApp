@@ -5,7 +5,9 @@ import com.cherenkov.videoapp.videoapp.data.network.KtorRemoteVideoDataSource
 import com.cherenkov.videoapp.videoapp.data.network.RemoteVideoDataSource
 import com.cherenkov.videoapp.videoapp.data.repository.DefaultVideoRepository
 import com.cherenkov.videoapp.videoapp.domain.VideoRepository
+import com.cherenkov.videoapp.videoapp.presentation.SelectedVideoViewModel
 import com.cherenkov.videoapp.videoapp.presentation.list_videos.VideoListViewModel
+import com.cherenkov.videoapp.videoapp.presentation.player.PlayerViewModel
 import io.ktor.client.engine.cio.CIO
 import org.koin.androidx.viewmodel.dsl.viewModelOf
 import org.koin.core.module.dsl.singleOf
@@ -20,4 +22,6 @@ val appModule = module {
     singleOf(::DefaultVideoRepository).bind<VideoRepository>()
 
     viewModelOf(::VideoListViewModel)
+    viewModelOf(::PlayerViewModel)
+    viewModelOf(::SelectedVideoViewModel)
 }

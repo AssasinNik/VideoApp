@@ -27,7 +27,7 @@ class DefaultVideoRepository(
             }
     }
 
-    override suspend fun getInfoVideo(id: String): Result<VideoInfo, DataError.Remote> {
+    override suspend fun getInfoVideo(id: Int): Result<VideoInfo, DataError.Remote> {
         return remoteVideoDataSource
             .getInfoVideo(id)
             .map { dto ->
