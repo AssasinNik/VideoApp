@@ -9,4 +9,6 @@ sealed interface PlayerAction {
     data object ExitFullScreen: PlayerAction
     data object OnBackClicked: PlayerAction
     data class OnVideoClicked(val id: Int): PlayerAction
+    data class SeekBySeconds(val time: Int): PlayerAction
+    data object Retry: PlayerAction
 }

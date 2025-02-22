@@ -45,13 +45,13 @@ class PlayerViewModel(
     private val videoId = savedStateHandle.toRoute<Route.PlayerScreen>().id
     private var player: ExoPlayer? = null
     private var controlsTimerJob: Job? = null
+    private var progressUpdateJob: Job? = null
     private val context = getApplication<Application>()
 
     private val _state = MutableStateFlow(PlayerState())
     val state = _state
         .onStart {
-            findVideoInfo()
-            searchPopularVideos()
+            initializePlayer()
         }
         .stateIn(
             viewModelScope,
@@ -71,18 +71,46 @@ class PlayerViewModel(
             is PlayerAction.OnBackClicked -> {
                 onCleared()
             }
+            is PlayerAction.SeekBySeconds -> handleSeekBySeconds(action.time)
+            is PlayerAction.Retry -> handleRetry()
+        }
+    }
+
+    private fun initializePlayer() {
+        viewModelScope.launch {
+            _state.update { it.copy(isLoading = true) }
+            repository.getInfoVideo(videoId)
+                .onSuccess { videoInfo ->
+                    player?.release()
+                    createNewPlayer(videoInfo.video_link)
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            playedVideo = videoInfo,
+                            errorMessage = null
+                        )
+                    }
+                    startProgressUpdates()
+                }
+                .onError { error ->
+                    _state.update {
+                        it.copy(
+                            isLoading = false,
+                            errorMessage = error.toUiText()
+                        )
+                    }
+                }
         }
     }
 
     @OptIn(UnstableApi::class)
-    private fun initializePlayer(url: String) {
+    private fun createNewPlayer(videoUrl: String) {
         player = ExoPlayer.Builder(context)
             .setSeekForwardIncrementMs(10000)
             .setSeekBackIncrementMs(10000)
             .build()
             .apply {
-                Log.d("video", url)
-                setMediaItem(MediaItem.fromUri(url))
+                setMediaItem(MediaItem.fromUri(videoUrl))
                 prepare()
                 playWhenReady = _state.value.isPlaying
 
@@ -90,60 +118,60 @@ class PlayerViewModel(
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         when (playbackState) {
                             Player.STATE_BUFFERING -> {
-                                _state.value = _state.value.copy(
-                                    isBuffering = true
-                                )
+                                _state.update { it.copy(isBuffering = true) }
                             }
                             Player.STATE_READY -> {
-                                _state.value = _state.value.copy(
-                                    isLoading = false,
-                                    isBuffering = false,
-                                    totalDuration = duration
-                                )
+                                _state.update {
+                                    it.copy(
+                                        isBuffering = false,
+                                        totalDuration = duration
+                                    )
+                                }
                             }
-                            else -> Unit
+                            Player.STATE_ENDED -> {
+                                _state.update { it.copy(isPlaying = false) }
+                            }
                         }
                     }
 
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
-                        _state.value = _state.value.copy(
-                            isPlaying = isPlaying
-                        )
+                        _state.update { it.copy(isPlaying = isPlaying) }
                     }
 
                     override fun onPlaybackParametersChanged(playbackParameters: PlaybackParameters) {
-                        _state.value = _state.value.copy(
-                            playbackSpeed = playbackParameters.speed
-                        )
+                        _state.update { it.copy(playbackSpeed = playbackParameters.speed) }
                     }
                 })
             }
-        _state.value = _state.value.copy(
-            player = player
-        )
+        _state.update { it.copy(player = player) }
     }
 
-    fun findVideoInfo() = viewModelScope.launch{
-        _state.update { it.copy(
-            isLoading = true
-        ) }
-        repository
-            .getInfoVideo(videoId)
-            .onSuccess { result ->
-                _state.update { it.copy(
-                    isLoading = false,
-                    errorMessage = null,
-                    playedVideo = result
-                ) }
-                initializePlayer(result.video_link)
+    private fun startProgressUpdates() {
+        progressUpdateJob?.cancel()
+        progressUpdateJob = viewModelScope.launch {
+            while (true) {
+                player?.let { player ->
+                    if (player.isPlaying || _state.value.isBuffering) {
+                        val currentPosition = player.currentPosition
+                        val bufferedPosition = player.bufferedPosition
+                        val duration = player.duration
+
+                        if (duration > 0) {
+                            val progress = currentPosition.toFloat() / duration
+                            val buffered = bufferedPosition.toFloat() / duration
+                            _state.update {
+                                it.copy(
+                                    currentTime = currentPosition,
+                                    progress = progress.coerceIn(0f, 1f),
+                                    buffered = buffered.coerceIn(0f, 1f)
+                                )
+                            }
+                        }
+                    }
+                }
+                delay(1000)
             }
-            .onError { error ->
-                _state.update { it.copy(
-                    topVideos = emptyList(),
-                    isLoading = false,
-                    errorMessage = error.toUiText()
-                ) }
-            }
+        }
     }
 
     private fun searchPopularVideos() = viewModelScope.launch{
@@ -170,11 +198,17 @@ class PlayerViewModel(
 
     private fun togglePlayPause() {
         player?.let {
-            it.playWhenReady = !it.isPlaying
-            _state.value = _state.value.copy(
-                isPlaying = it.playWhenReady,
-                showControls = true
-            )
+            if (it.isPlaying) {
+                it.pause()
+            } else {
+                it.play()
+            }
+            _state.update { state ->
+                state.copy(
+                    isPlaying = it.isPlaying,
+                    showControls = true
+                )
+            }
             startControlsTimer()
         }
     }
@@ -190,14 +224,17 @@ class PlayerViewModel(
 
     private fun seekTo(position: Float) {
         player?.let { player ->
-            if (player.duration > 0) {
-                val seekTime = (player.duration * position).toLong()
+            val duration = player.duration
+            if (duration != C.TIME_UNSET) {
+                val seekTime = (duration * position.coerceIn(0f, 1f)).toLong()
                 player.seekTo(seekTime)
-                _state.value = _state.value.copy(
-                    progress = position,
-                    currentTime = seekTime,
-                    showControls = true
-                )
+                _state.update {
+                    it.copy(
+                        currentTime = seekTime,
+                        progress = position,
+                        showControls = true
+                    )
+                }
                 startControlsTimer()
             }
         }
@@ -227,14 +264,15 @@ class PlayerViewModel(
         controlsTimerJob?.cancel()
         controlsTimerJob = viewModelScope.launch {
             delay(3000L)
-            _state.value = _state.value.copy(
-                showControls = false
-            )
+            _state.update {
+                if (!it.isControlsLocked) it.copy(showControls = false) else it
+            }
         }
     }
 
     private fun releasePlayer() {
         controlsTimerJob?.cancel()
+        progressUpdateJob?.cancel()
         player?.release()
         player = null
     }
@@ -242,6 +280,30 @@ class PlayerViewModel(
     override fun onCleared() {
         super.onCleared()
         releasePlayer()
+    }
+
+    private fun handleSeekBySeconds(seconds: Int) {
+        player?.let { exoPlayer ->
+            val currentPosition = exoPlayer.currentPosition
+            val newPosition = currentPosition + seconds * 1000L
+            val duration = exoPlayer.duration
+
+            val safePosition = newPosition.coerceIn(0, duration)
+            exoPlayer.seekTo(safePosition)
+
+            _state.update { it.copy(
+                currentTime = safePosition,
+                progress = if (duration > 0) (safePosition.toFloat() / duration) else 0f
+            ) }
+        }
+    }
+
+    private fun handleRetry() {
+        _state.update { it.copy(
+            isLoading = true,
+            errorMessage = null
+        ) }
+        initializePlayer()
     }
 
 

@@ -1,26 +1,49 @@
 package com.cherenkov.videoapp.videoapp.presentation.player
 
+import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Context
 import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.with
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,10 +57,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -55,6 +81,7 @@ import org.koin.androidx.compose.koinViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 
 @Composable
 fun PlayerScreenRoot(
@@ -80,379 +107,423 @@ fun PlayerScreenRoot(
 fun PlayerScreen(
     state: PlayerState,
     onAction: (PlayerAction) -> Unit
-) {}
-
-@Composable
-fun VideoPlayerScreen(
-    viewModel: PlayerViewModel,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier
 ) {
-    val state by viewModel.state.collectAsState()
     val systemUiController = rememberSystemUiController()
-    val isFullscreen by remember { derivedStateOf { state.isFullscreen } }
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
 
-    DisposableEffect(isFullscreen) {
-        if (isFullscreen) {
-            systemUiController.isNavigationBarVisible = false
-        } else {
-            systemUiController.isNavigationBarVisible = true
-        }
+    DisposableEffect(state.isFullscreen) {
+        systemUiController.isNavigationBarVisible = !state.isFullscreen
+        systemUiController.isStatusBarVisible = !state.isFullscreen
         onDispose {}
     }
 
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
         when {
-            state.isLoading -> LoadingShimmer()
-            state.errorMessage != null -> ErrorState(error = state.errorMessage!!.asString(), onRetry = viewModel::findVideoInfo)
+            state.isLoading -> YouTubeStyleLoading()
+            state.errorMessage != null -> YouTubeErrorState(
+                error = state.errorMessage!!.asString(),
+                onRetry = { onAction(PlayerAction.Retry) }
+            )
             else -> {
-                VideoPlayerComponent(
-                    state = state,
-                    onEvent = viewModel::onAction,
-                    isFullscreen = isFullscreen,
-                    onBack = onBack,
-                    modifier = Modifier.fillMaxSize()
-                )
+                PlayerContent(state, onAction, isLandscape)
+                ControlsOverlay(state, onAction, isLandscape)
             }
         }
     }
 }
 
 @Composable
-private fun VideoPlayerComponent(
+private fun PlayerContent(
     state: PlayerState,
-    onEvent: (PlayerAction) -> Unit,
-    isFullscreen: Boolean,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier
+    onAction: (PlayerAction) -> Unit,
+    isLandscape: Boolean
 ) {
-    val orientation = rememberOrientation()
-    val animationSpec = remember { tween<Float>(300, easing = FastOutSlowInEasing) }
+    val transition = updateTransition(targetState = state.showControls, label = "controlsTransition")
+    val controlsAlpha by transition.animateFloat { show ->
+        if (show) 1f else 0f
+    }
 
-    Box(modifier = modifier.clickable { onEvent(PlayerAction.ToggleControls) }) {
-        PlayerSurface(
-            player = state.player,
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black)
-        )
-
-        AnimatedVisibility(
-            visible = state.showControls,
-            enter = fadeIn(animationSpec),
-            exit = fadeOut(animationSpec)
-        ) {
-            ControlsOverlay(
-                state = state,
-                onEvent = onEvent,
-                isFullscreen = isFullscreen,
-                onBack = onBack,
-                orientation = orientation,
-                modifier = Modifier.fillMaxSize()
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .pointerInput(Unit) {
+            detectTapGestures(
+                onTap = { onAction(PlayerAction.ToggleControls) },
+                onDoubleTap = { offset ->
+                    val seekPosition = if (offset.x < size.width / 2) -3 else 3
+                    onAction(PlayerAction.SeekBySeconds(seekPosition))
+                }
             )
         }
+    ) {
+        YouTubePlayerView(player = state.player)
 
         AnimatedVisibility(
             visible = state.isBuffering,
             enter = fadeIn(),
             exit = fadeOut()
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.7f)),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    color = MaterialTheme.colorScheme.primary,
-                    strokeWidth = 3.dp
-                )
-            }
+            BufferingIndicator()
         }
     }
 }
 
 @OptIn(UnstableApi::class)
 @Composable
-private fun PlayerSurface(
-    player: ExoPlayer?,
-    modifier: Modifier = Modifier
-) {
+private fun YouTubePlayerView(player: ExoPlayer?) {
     AndroidView(
-        factory = { ctx ->
-            PlayerView(ctx).apply {
+        factory = { context ->
+            PlayerView(context).apply {
                 useController = false
-                this.player = player
                 resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                this.player = player
                 setShowBuffering(SHOW_BUFFERING_ALWAYS)
-                setBackgroundColor(0xFF88888)
+                setBackgroundColor(0xFF00000)
             }
         },
-        modifier = modifier
+        update = { playerView ->
+            playerView.player = player
+        },
+        modifier = Modifier.fillMaxSize()
     )
 }
 
 @Composable
 private fun ControlsOverlay(
     state: PlayerState,
-    onEvent: (PlayerAction) -> Unit,
-    isFullscreen: Boolean,
-    onBack: () -> Unit,
-    orientation: Orientation,
-    modifier: Modifier = Modifier
+    onAction: (PlayerAction) -> Unit,
+    isLandscape: Boolean
 ) {
-    Box(modifier = modifier.background(
-        Brush.verticalGradient(
-            colors = listOf(
-                Color.Black.copy(alpha = 0.7f),
-                Color.Transparent,
-                Color.Black.copy(alpha = 0.7f)
-            ),
-            startY = 0f,
-            endY = 500f
+    AnimatedVisibility(
+        visible = state.showControls,
+        enter = fadeIn() + slideInVertically { it },
+        exit = fadeOut() + slideOutVertically { it },
+        modifier = Modifier.background(
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color.Black.copy(alpha = 0.7f),
+                    Color.Transparent,
+                    Color.Black.copy(alpha = 0.7f)
+                )
+            )
         )
-    )) {
-        Row(
+    ) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            TopControlsBar(onAction, state)
+            Spacer(Modifier.weight(1f))
+            BottomControlsPanel(state, onAction, isLandscape)
+        }
+    }
+}
+
+@Composable
+private fun TopControlsBar(
+    onAction: (PlayerAction) -> Unit,
+    state: PlayerState
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        IconButton(
+            onClick = { onAction(PlayerAction.OnBackClicked) },
+            modifier = Modifier.size(40.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.ArrowBack,
+                contentDescription = "Back",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+
+        Text(
+            text = "Pexels Video",
+            color = Color.White,
+            style = MaterialTheme.typography.titleMedium,
+            maxLines = 1,
+            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+        )
+
+        IconButton(
+            onClick = { onAction(
+                if (state.isFullscreen) PlayerAction.ExitFullScreen
+                else PlayerAction.EnterFullScreen
+            ) },
+            modifier = Modifier.size(40.dp)
+        ) {
+            Icon(
+                imageVector = if (state.isFullscreen) Icons.Default.FullscreenExit
+                else Icons.Default.Fullscreen,
+                contentDescription = "Fullscreen",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun BottomControlsPanel(
+    state: PlayerState,
+    onAction: (PlayerAction) -> Unit,
+    isLandscape: Boolean
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        YouTubeSeekBar(state, onAction)
+
+        Spacer(Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = Color.White
-                )
-            }
+            PlaybackControls(state, onAction)
 
-            Spacer(modifier = Modifier.weight(1f))
-
-            IconButton(
-                onClick = {
-                    if (isFullscreen) onEvent(PlayerAction.ExitFullScreen)
-                    else onEvent(PlayerAction.EnterFullScreen)
-                },
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(
-                    imageVector = if (isFullscreen) Icons.Default.FullscreenExit
-                    else Icons.Default.Fullscreen,
-                    contentDescription = "Fullscreen",
-                    tint = Color.White
-                )
-            }
-        }
-
-        // Center Controls
-        Box(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            IconButton(
-                onClick = { onEvent(PlayerAction.PlayPause) },
-                modifier = Modifier.size(64.dp)
-            ) {
-                Icon(
-                    imageVector = if (state.isPlaying) Icons.Default.Pause
-                    else Icons.Default.PlayArrow,
-                    contentDescription = "Play/Pause",
-                    tint = Color.White,
-                    modifier = Modifier.fillMaxSize()
-                )
-            }
-        }
-
-        // Bottom Controls
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .padding(16.dp)
-        ) {
-            SeekBar(
-                progress = state.progress,
-                buffered = state.buffered,
-                onSeek = { pos -> onEvent(PlayerAction.SeekTo(pos)) },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = state.currentTime.toFormattedTime(),
-                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.White)
-                )
-
-                Text(
-                    text = state.totalDuration.toFormattedTime(),
-                    style = MaterialTheme.typography.bodyMedium.copy(color = Color.White)
-                )
+            if (isLandscape) {
+                Spacer(Modifier.weight(1f))
+                //PlaybackSpeedButton(state, onAction)
             }
         }
     }
 }
 
 @Composable
-private fun SeekBar(
-    progress: Float,
-    buffered: Float,
-    onSeek: (Float) -> Unit,
-    modifier: Modifier = Modifier
+private fun YouTubeSeekBar(
+    state: PlayerState,
+    onAction: (PlayerAction) -> Unit
 ) {
     var dragging by remember { mutableStateOf(false) }
 
-    Box(modifier = modifier.height(40.dp)) {
-        Canvas(modifier = Modifier
-            .fillMaxWidth()
-            .height(4.dp)
-            .align(Alignment.CenterStart)
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Slider(
+            value = state.progress,
+            onValueChange = {
+                dragging = true
+                onAction(PlayerAction.SeekTo(it))
+            },
+            onValueChangeFinished = { dragging = false },
+            colors = SliderDefaults.colors(
+                thumbColor = Color.Red,
+                activeTrackColor = Color.Red.copy(alpha = 0.5f),
+                inactiveTrackColor = Color.White.copy(alpha = 0.2f)
+            ),
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            drawRect(
-                color = Color.White.copy(alpha = 0.3f),
-                size = Size(size.width * buffered, size.height)
+            Text(
+                text = state.currentTime.toYouTubeTime(),
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall
             )
-            drawRect(
-                color = Color.Cyan,
-                size = Size(size.width * progress, size.height)
+            Text(
+                text = state.totalDuration.toYouTubeTime(),
+                color = Color.White,
+                style = MaterialTheme.typography.labelSmall
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlaybackControls(
+    state: PlayerState,
+    onAction: (PlayerAction) -> Unit
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        IconButton(
+            onClick = { onAction(PlayerAction.SeekBySeconds(-3)) },
+            modifier = Modifier.size(40.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Replay10,
+                contentDescription = "Rewind 10s",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
             )
         }
 
-        Slider(
-            value = progress,
-            onValueChange = {
-                dragging = true
-                onSeek(it)
-            },
-            onValueChangeFinished = { dragging = false },
-            modifier = Modifier.fillMaxWidth(),
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = Color.Transparent,
-                inactiveTrackColor = Color.Transparent
+        YouTubePlayPauseButton(state.isPlaying) {
+            onAction(PlayerAction.PlayPause)
+        }
+
+        IconButton(
+            onClick = { onAction(PlayerAction.SeekBySeconds(3)) },
+            modifier = Modifier.size(40.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Forward10,
+                contentDescription = "Forward 10s",
+                tint = Color.White,
+                modifier = Modifier.size(24.dp)
             )
-        )
+        }
+    }
+}
+
+@kotlin.OptIn(ExperimentalAnimationApi::class)
+@Composable
+private fun YouTubePlayPauseButton(
+    isPlaying: Boolean,
+    onClick: () -> Unit
+) {
+    val transition = updateTransition(isPlaying, label = "playPause")
+    val size by transition.animateDp(label = "size") { playing ->
+        if (playing) 48.dp else 56.dp
+    }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(Color.Red.copy(alpha = 0.9f))
+            .clickable(onClick = onClick)
+    ) {
+        AnimatedContent(
+            targetState = isPlaying,
+            transitionSpec = {
+                scaleIn() with scaleOut()
+            }
+        ) { playing ->
+            if (playing) {
+                Icon(
+                    Icons.Default.Pause,
+                    "Pause",
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+            } else {
+                Icon(
+                    Icons.Default.PlayArrow,
+                    "Play",
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
     }
 }
 
 @Composable
-private fun LoadingShimmer() {
-    Box(modifier = Modifier.fillMaxSize()) {
-        ShimmerAnimation(
-            modifier = Modifier.fillMaxSize()
-        )
+private fun BufferingIndicator() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.7f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            CircularProgressIndicator(
+                color = Color.White,
+                strokeWidth = 3.dp,
+                modifier = Modifier.size(48.dp)
+            )
+            Text(
+                text = "Buffering...",
+                color = Color.White,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
     }
 }
 
 @Composable
-private fun ErrorState(
+private fun YouTubeStyleLoading() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            CircularProgressIndicator(
+                color = Color.Red,
+                strokeWidth = 4.dp,
+                modifier = Modifier.size(48.dp)
+            )
+            Text(
+                text = "Loading Video...",
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium
+            )
+        }
+    }
+}
+
+@Composable
+private fun YouTubeErrorState(
     error: String,
     onRetry: () -> Unit
 ) {
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(Color.Black)
             .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
+        contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = error,
-            style = MaterialTheme.typography.bodyLarge.copy(color = Color.White),
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-        Button(
-            onClick = onRetry,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary
-            )
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            Text("Retry", color = Color.White)
-        }
-    }
-}
-@Composable
-fun ShimmerAnimation(
-    modifier: Modifier = Modifier,
-    baseColor: Color = Color.DarkGray,
-    highlightColor: Color = Color.LightGray,
-    durationMillis: Int = 1000
-) {
-    val transition = rememberInfiniteTransition()
-    val translateAnim by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = durationMillis,
-                easing = LinearEasing
+            Icon(
+                Icons.Default.ErrorOutline,
+                "Error",
+                tint = Color.Red,
+                modifier = Modifier.size(64.dp)
             )
-        )
-    )
 
-    val brush = Brush.linearGradient(
-        colors = listOf(
-            baseColor,
-            highlightColor,
-            baseColor
-        ),
-        start = Offset(translateAnim - 0.2f, 0f),
-        end = Offset(translateAnim + 0.2f, 0f)
-    )
+            Text(
+                text = error,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                textAlign = TextAlign.Center
+            )
 
-    Box(
-        modifier = modifier
-            .background(brush)
-            .shimmerEffect()
-    )
-}
-
-private fun Modifier.shimmerEffect(): Modifier = composed {
-    var size by remember { mutableStateOf(IntSize.Zero) }
-    val gradient = listOf(
-        Color.DarkGray.copy(alpha = 0.3f),
-        Color.DarkGray.copy(alpha = 0.5f),
-        Color.DarkGray.copy(alpha = 0.3f)
-    )
-
-    val transition = rememberInfiniteTransition()
-    val startOffsetX by transition.animateFloat(
-        initialValue = -2f,
-        targetValue = 2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1000, easing = LinearEasing)
-        )
-    )
-
-    background(
-        brush = Brush.linearGradient(
-            colors = gradient,
-            start = Offset(startOffsetX, 0f),
-            end = Offset(startOffsetX + 1f, 1f)
-        )
-    )
-}
-fun Long.toFormattedTime(): String {
-    return SimpleDateFormat("mm:ss", Locale.getDefault()).format(Date(this))
-}
-
-@Composable
-fun rememberOrientation(): Orientation {
-    val configuration = LocalConfiguration.current
-    return remember(configuration) {
-        if (configuration.screenWidthDp > configuration.screenHeightDp) {
-            Orientation.Horizontal
-        } else {
-            Orientation.Vertical
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Red,
+                    contentColor = Color.White
+                ),
+                elevation = ButtonDefaults.buttonElevation(8.dp),
+                modifier = Modifier.height(48.dp)
+            ) {
+                Icon(Icons.Default.Refresh, "Retry", Modifier.size(24.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Try Again", style = MaterialTheme.typography.labelLarge)
+            }
         }
     }
 }
 
+@SuppressLint("DefaultLocale")
+private fun Long.toYouTubeTime(): String {
+    val hours = TimeUnit.MILLISECONDS.toHours(this)
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(this) % 60
+    val seconds = TimeUnit.MILLISECONDS.toSeconds(this) % 60
+
+    return if (hours > 0) {
+        String.format("%d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format("%02d:%02d", minutes, seconds)
+    }
+}

@@ -31,7 +31,6 @@ import com.cherenkov.videoapp.videoapp.presentation.list_videos.VideoListViewMod
 import com.cherenkov.videoapp.videoapp.presentation.player.PlayerAction
 import com.cherenkov.videoapp.videoapp.presentation.player.PlayerScreenRoot
 import com.cherenkov.videoapp.videoapp.presentation.player.PlayerViewModel
-import com.cherenkov.videoapp.videoapp.presentation.player.VideoPlayerScreen
 import com.cherenkov.videoapp.videoapp.utils.Route
 import org.koin.androidx.compose.koinViewModel
 
@@ -96,7 +95,6 @@ class MainActivity : ComponentActivity() {
                                         viewModel.onAction(PlayerAction.OnVideoClicked(it))
                                     }
                                 }
-                                /*
                                 PlayerScreenRoot(
                                     viewModel = viewModel,
                                     onBackClick = {
@@ -108,10 +106,6 @@ class MainActivity : ComponentActivity() {
                                             Route.PlayerScreen(video)
                                         )
                                     }
-                                )*/
-                                VideoPlayerScreen(
-                                    viewModel = viewModel,
-                                    onBack = {navController.popBackStack()}
                                 )
                             }
                         }

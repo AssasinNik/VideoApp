@@ -11,8 +11,7 @@ data class PlayerState(
     val topVideos: List<VideoItem> = emptyList(),
     val isLoading: Boolean = true,
     val errorMessage: UiText? = null,
-    val playedVideo : VideoInfo? = null,
-    val idPlayedVideo: Int? = null,
+    val playedVideo: VideoInfo? = null,
     val isPlaying: Boolean = false,
     val isFullscreen: Boolean = false,
     val showControls: Boolean = false,
@@ -20,5 +19,6 @@ data class PlayerState(
     val buffered: Float = 0f,
     val totalDuration: Long = 0L,
     val currentTime: Long = 0L,
-    val playbackSpeed: Float = 0f
+    val playbackSpeed: Float = 1f,
+    val isControlsLocked: Boolean = false
 )
