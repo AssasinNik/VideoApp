@@ -1,6 +1,11 @@
 package com.cherenkov.videoapp
 
+import android.app.PictureInPictureParams
+import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
+import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -25,7 +30,6 @@ import androidx.navigation.compose.navigation
 import androidx.navigation.compose.rememberNavController
 import com.cherenkov.videoapp.ui.theme.VideoAppTheme
 import com.cherenkov.videoapp.videoapp.presentation.SelectedVideoViewModel
-import com.cherenkov.videoapp.videoapp.presentation.list_videos.VideoListScreen
 import com.cherenkov.videoapp.videoapp.presentation.list_videos.VideoListScreenRoot
 import com.cherenkov.videoapp.videoapp.presentation.list_videos.VideoListViewModel
 import com.cherenkov.videoapp.videoapp.presentation.player.PlayerAction
@@ -35,6 +39,7 @@ import com.cherenkov.videoapp.videoapp.utils.Route
 import org.koin.androidx.compose.koinViewModel
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -45,6 +50,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
+
                     NavHost(
                         navController = navController,
                         startDestination = Route.VideoGraph

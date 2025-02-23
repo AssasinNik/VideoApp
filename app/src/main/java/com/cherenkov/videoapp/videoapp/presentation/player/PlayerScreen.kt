@@ -1,35 +1,15 @@
 package com.cherenkov.videoapp.videoapp.presentation.player
 
 import android.annotation.SuppressLint
-import android.app.Activity
-import android.content.Context
-import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDp
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.with
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -38,8 +18,6 @@ import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.FullscreenExit
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
@@ -56,32 +34,26 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
-import androidx.media3.ui.PlayerView.SHOW_BUFFERING_ALWAYS
+import com.cherenkov.videoapp.videoapp.domain.models.VideoInfo
 import com.google.accompanist.systemuicontroller.rememberSystemUiController
 import org.koin.androidx.compose.koinViewModel
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.concurrent.TimeUnit
+import android.content.res.Configuration
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.animateContentSize
+import androidx.media3.common.util.UnstableApi
 
 @Composable
 fun PlayerScreenRoot(
@@ -110,54 +82,69 @@ fun PlayerScreen(
 ) {
     val systemUiController = rememberSystemUiController()
     val configuration = LocalConfiguration.current
-    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    LaunchedEffect(configuration.orientation) {
+        if (isLandscape && !state.isFullscreen) {
+            onAction(PlayerAction.EnterFullScreen)
+        } else if (!isLandscape && state.isFullscreen) {
+            onAction(PlayerAction.ExitFullScreen)
+        }
+    }
 
     DisposableEffect(state.isFullscreen) {
         systemUiController.isNavigationBarVisible = !state.isFullscreen
         systemUiController.isStatusBarVisible = !state.isFullscreen
-        onDispose {}
+        onDispose { }
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF121212), Color(0xFF1F1B24))
+                )
+            )
+    ) {
         when {
-            state.isLoading -> YouTubeStyleLoading()
-            state.errorMessage != null -> YouTubeErrorState(
+            state.isLoading -> FullScreenLoading()
+            state.errorMessage != null -> ErrorState(
                 error = state.errorMessage!!.asString(),
                 onRetry = { onAction(PlayerAction.Retry) }
             )
             else -> {
-                PlayerContent(state, onAction, isLandscape)
-                ControlsOverlay(state, onAction, isLandscape)
+                if (state.isFullscreen) {
+                    FullScreenPlayer(state, onAction)
+                } else {
+                    NonFullScreenPlayer(state, onAction)
+                }
             }
         }
     }
 }
 
 @Composable
-private fun PlayerContent(
+private fun FullScreenPlayer(
     state: PlayerState,
-    onAction: (PlayerAction) -> Unit,
-    isLandscape: Boolean
+    onAction: (PlayerAction) -> Unit
 ) {
-    val transition = updateTransition(targetState = state.showControls, label = "controlsTransition")
-    val controlsAlpha by transition.animateFloat { show ->
-        if (show) 1f else 0f
-    }
-
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .pointerInput(Unit) {
-            detectTapGestures(
-                onTap = { onAction(PlayerAction.ToggleControls) },
-                onDoubleTap = { offset ->
-                    val seekPosition = if (offset.x < size.width / 2) -3 else 3
-                    onAction(PlayerAction.SeekBySeconds(seekPosition))
-                }
-            )
-        }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .animateContentSize()
+            .pointerInput(Unit) {
+                detectTapGestures(
+                    onTap = { onAction(PlayerAction.ToggleControls) },
+                    onDoubleTap = { offset ->
+                        val seekBy = if (offset.x < size.width / 2) -3 else 3
+                        onAction(PlayerAction.SeekBySeconds(seekBy))
+                    }
+                )
+            }
     ) {
-        YouTubePlayerView(player = state.player)
-
+        Crossfade(targetState = state.player) { player ->
+            YouTubePlayerView(player = player)
+        }
         AnimatedVisibility(
             visible = state.isBuffering,
             enter = fadeIn(),
@@ -165,48 +152,103 @@ private fun PlayerContent(
         ) {
             BufferingIndicator()
         }
+        AnimatedVisibility(
+            visible = state.showControls,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.4f))
+            )
+        }
+        ControlsOverlay(state = state, onAction = onAction)
     }
 }
 
-@OptIn(UnstableApi::class)
 @Composable
-private fun YouTubePlayerView(player: ExoPlayer?) {
-    AndroidView(
-        factory = { context ->
-            PlayerView(context).apply {
-                useController = false
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                this.player = player
-                setShowBuffering(SHOW_BUFFERING_ALWAYS)
-                setBackgroundColor(0xFF00000)
+private fun NonFullScreenPlayer(
+    state: PlayerState,
+    onAction: (PlayerAction) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .animateContentSize()
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { onAction(PlayerAction.ToggleControls) },
+                        onDoubleTap = { offset ->
+                            val seekBy = if (offset.x < size.width / 2) -3 else 3
+                            onAction(PlayerAction.SeekBySeconds(seekBy))
+                        }
+                    )
+                }
+        ) {
+            Crossfade(targetState = state.player) { player ->
+                YouTubePlayerView(player = player)
             }
-        },
-        update = { playerView ->
-            playerView.player = player
-        },
-        modifier = Modifier.fillMaxSize()
-    )
+            this@Column.AnimatedVisibility(
+                visible = state.isBuffering,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                BufferingIndicator()
+            }
+            this@Column.AnimatedVisibility(
+                visible = state.showControls,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.4f))
+                )
+            }
+            ControlsOverlay(state = state, onAction = onAction)
+        }
+        VideoInfoPanel(videoInfo = state.playedVideo)
+    }
+}
+
+
+@Composable
+fun VideoInfoPanel(videoInfo: VideoInfo?) {
+    if (videoInfo == null) return
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF1E1E1E))
+            .padding(16.dp)
+    ) {
+        Text(
+            text = "Pexels Video",
+            style = MaterialTheme.typography.titleMedium.copy(color = Color.White)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = videoInfo.author,
+            style = MaterialTheme.typography.bodyMedium.copy(color = Color.LightGray)
+        )
+    }
 }
 
 @Composable
 private fun ControlsOverlay(
     state: PlayerState,
-    onAction: (PlayerAction) -> Unit,
-    isLandscape: Boolean
+    onAction: (PlayerAction) -> Unit
 ) {
     AnimatedVisibility(
         visible = state.showControls,
-        enter = fadeIn() + slideInVertically { it },
-        exit = fadeOut() + slideOutVertically { it },
-        modifier = Modifier.background(
-            Brush.verticalGradient(
-                colors = listOf(
-                    Color.Black.copy(alpha = 0.7f),
-                    Color.Transparent,
-                    Color.Black.copy(alpha = 0.7f)
-                )
-            )
-        )
+        enter = fadeIn(),
+        exit = fadeOut()
     ) {
         Column(
             modifier = Modifier
@@ -214,8 +256,8 @@ private fun ControlsOverlay(
                 .padding(16.dp)
         ) {
             TopControlsBar(onAction, state)
-            Spacer(Modifier.weight(1f))
-            BottomControlsPanel(state, onAction, isLandscape)
+            Spacer(modifier = Modifier.weight(1f))
+            BottomControlsPanel(state, onAction)
         }
     }
 }
@@ -241,7 +283,6 @@ private fun TopControlsBar(
                 modifier = Modifier.size(24.dp)
             )
         }
-
         Text(
             text = "Pexels Video",
             color = Color.White,
@@ -249,17 +290,17 @@ private fun TopControlsBar(
             maxLines = 1,
             modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
         )
-
         IconButton(
-            onClick = { onAction(
-                if (state.isFullscreen) PlayerAction.ExitFullScreen
-                else PlayerAction.EnterFullScreen
-            ) },
+            onClick = {
+                onAction(
+                    if (state.isFullscreen) PlayerAction.ExitFullScreen
+                    else PlayerAction.EnterFullScreen
+                )
+            },
             modifier = Modifier.size(40.dp)
         ) {
             Icon(
-                imageVector = if (state.isFullscreen) Icons.Default.FullscreenExit
-                else Icons.Default.Fullscreen,
+                imageVector = if (state.isFullscreen) Icons.Default.FullscreenExit else Icons.Default.Fullscreen,
                 contentDescription = "Fullscreen",
                 tint = Color.White,
                 modifier = Modifier.size(24.dp)
@@ -271,25 +312,17 @@ private fun TopControlsBar(
 @Composable
 private fun BottomControlsPanel(
     state: PlayerState,
-    onAction: (PlayerAction) -> Unit,
-    isLandscape: Boolean
+    onAction: (PlayerAction) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         YouTubeSeekBar(state, onAction)
-
-        Spacer(Modifier.height(8.dp))
-
+        Spacer(modifier = Modifier.height(8.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             PlaybackControls(state, onAction)
-
-            if (isLandscape) {
-                Spacer(Modifier.weight(1f))
-                //PlaybackSpeedButton(state, onAction)
-            }
         }
     }
 }
@@ -300,7 +333,6 @@ private fun YouTubeSeekBar(
     onAction: (PlayerAction) -> Unit
 ) {
     var dragging by remember { mutableStateOf(false) }
-
     Column(modifier = Modifier.fillMaxWidth()) {
         Slider(
             value = state.progress,
@@ -310,13 +342,12 @@ private fun YouTubeSeekBar(
             },
             onValueChangeFinished = { dragging = false },
             colors = SliderDefaults.colors(
-                thumbColor = Color.Red,
-                activeTrackColor = Color.Red.copy(alpha = 0.5f),
+                thumbColor = Color(0xFFBB86FC),
+                activeTrackColor = Color(0xFFBB86FC).copy(alpha = 0.5f),
                 inactiveTrackColor = Color.White.copy(alpha = 0.2f)
             ),
             modifier = Modifier.fillMaxWidth()
         )
-
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
@@ -350,23 +381,19 @@ private fun PlaybackControls(
         ) {
             Icon(
                 imageVector = Icons.Default.Replay10,
-                contentDescription = "Rewind 10s",
+                contentDescription = "Rewind",
                 tint = Color.White,
                 modifier = Modifier.size(24.dp)
             )
         }
-
-        YouTubePlayPauseButton(state.isPlaying) {
-            onAction(PlayerAction.PlayPause)
-        }
-
+        YouTubePlayPauseButton(isPlaying = state.isPlaying) { onAction(PlayerAction.PlayPause) }
         IconButton(
             onClick = { onAction(PlayerAction.SeekBySeconds(3)) },
             modifier = Modifier.size(40.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Forward10,
-                contentDescription = "Forward 10s",
+                contentDescription = "Forward",
                 tint = Color.White,
                 modifier = Modifier.size(24.dp)
             )
@@ -374,42 +401,39 @@ private fun PlaybackControls(
     }
 }
 
-@kotlin.OptIn(ExperimentalAnimationApi::class)
+@OptIn(ExperimentalAnimationApi::class)
 @Composable
 private fun YouTubePlayPauseButton(
     isPlaying: Boolean,
     onClick: () -> Unit
 ) {
-    val transition = updateTransition(isPlaying, label = "playPause")
+    val transition = androidx.compose.animation.core.updateTransition(targetState = isPlaying, label = "playPause")
     val size by transition.animateDp(label = "size") { playing ->
         if (playing) 48.dp else 56.dp
     }
-
     Box(
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(size)
             .clip(CircleShape)
-            .background(Color.Red.copy(alpha = 0.9f))
+            .background(Color(0xFFBB86FC).copy(alpha = 0.9f))
             .clickable(onClick = onClick)
     ) {
         AnimatedContent(
             targetState = isPlaying,
-            transitionSpec = {
-                scaleIn() with scaleOut()
-            }
+            transitionSpec = { fadeIn() with fadeOut() }
         ) { playing ->
             if (playing) {
                 Icon(
-                    Icons.Default.Pause,
-                    "Pause",
+                    imageVector = Icons.Default.Pause,
+                    contentDescription = "Pause",
                     tint = Color.White,
                     modifier = Modifier.size(32.dp)
                 )
             } else {
                 Icon(
-                    Icons.Default.PlayArrow,
-                    "Play",
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "Play",
                     tint = Color.White,
                     modifier = Modifier.size(32.dp)
                 )
@@ -431,7 +455,7 @@ private fun BufferingIndicator() {
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             CircularProgressIndicator(
-                color = Color.White,
+                color = Color(0xFFBB86FC),
                 strokeWidth = 3.dp,
                 modifier = Modifier.size(48.dp)
             )
@@ -445,7 +469,7 @@ private fun BufferingIndicator() {
 }
 
 @Composable
-private fun YouTubeStyleLoading() {
+private fun FullScreenLoading() {
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -455,7 +479,7 @@ private fun YouTubeStyleLoading() {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             CircularProgressIndicator(
-                color = Color.Red,
+                color = Color(0xFFBB86FC),
                 strokeWidth = 4.dp,
                 modifier = Modifier.size(48.dp)
             )
@@ -469,7 +493,7 @@ private fun YouTubeStyleLoading() {
 }
 
 @Composable
-private fun YouTubeErrorState(
+private fun ErrorState(
     error: String,
     onRetry: () -> Unit
 ) {
@@ -485,30 +509,28 @@ private fun YouTubeErrorState(
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             Icon(
-                Icons.Default.ErrorOutline,
-                "Error",
-                tint = Color.Red,
+                imageVector = Icons.Default.ErrorOutline,
+                contentDescription = "Error",
+                tint = Color(0xFFBB86FC),
                 modifier = Modifier.size(64.dp)
             )
-
             Text(
                 text = error,
                 color = Color.White,
                 style = MaterialTheme.typography.titleMedium,
                 textAlign = TextAlign.Center
             )
-
             Button(
                 onClick = onRetry,
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Red,
+                    containerColor = Color(0xFFBB86FC),
                     contentColor = Color.White
                 ),
                 elevation = ButtonDefaults.buttonElevation(8.dp),
                 modifier = Modifier.height(48.dp)
             ) {
-                Icon(Icons.Default.Refresh, "Retry", Modifier.size(24.dp))
-                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Default.Refresh, contentDescription = "Retry", modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(8.dp))
                 Text("Try Again", style = MaterialTheme.typography.labelLarge)
             }
         }
@@ -520,10 +542,29 @@ private fun Long.toYouTubeTime(): String {
     val hours = TimeUnit.MILLISECONDS.toHours(this)
     val minutes = TimeUnit.MILLISECONDS.toMinutes(this) % 60
     val seconds = TimeUnit.MILLISECONDS.toSeconds(this) % 60
-
     return if (hours > 0) {
         String.format("%d:%02d:%02d", hours, minutes, seconds)
     } else {
         String.format("%02d:%02d", minutes, seconds)
     }
 }
+
+@androidx.annotation.OptIn(UnstableApi::class)
+@Composable
+private fun YouTubePlayerView(player: ExoPlayer?) {
+    androidx.compose.ui.viewinterop.AndroidView(
+        factory = { context ->
+            PlayerView(context).apply {
+                useController = false
+                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                this.player = player
+                setShowBuffering(PlayerView.SHOW_BUFFERING_ALWAYS)
+            }
+        },
+        update = { playerView ->
+            playerView.player = player
+        },
+        modifier = Modifier.fillMaxSize()
+    )
+}
+

@@ -1,5 +1,6 @@
 package com.cherenkov.videoapp.videoapp.presentation.list_videos
 
+import android.content.res.Configuration
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
@@ -10,12 +11,18 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,6 +30,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -41,6 +49,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
@@ -77,6 +86,9 @@ fun VideoListScreen(
     onAction: (VideoListAction) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
     Scaffold(
         containerColor = Color.Transparent
     ) { paddingValues ->
@@ -89,63 +101,142 @@ fun VideoListScreen(
                     )
                 )
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                CustomHeader(
-                    query = searchQuery,
-                    onQueryChanged = {
-                        searchQuery = it
-                        onAction(VideoListAction.OnChangedText(it))
-                    },
-                    onBackClicked = { searchQuery = "" },
-                    onFocusChanged = { /* Обработка фокуса, если необходимо */ }
-                )
-                LazyColumn(
-                    modifier = Modifier
-                        .padding(paddingValues)
-                        .fillMaxSize(),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Логика отображения видео
-                    if (searchQuery.isNotEmpty()) {
-                        if (state.isFinding) {
-                            items(5) { VideoItemShimmer() }
-                        } else if (state.searchedVideos.isEmpty()) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 40.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Ничего не найдено",
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = Color.LightGray
+            if (isLandscape) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(300.dp)
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.Top
+                    ) {
+                        Text(
+                            text = "Pexels Видео",
+                            style = MaterialTheme.typography.titleLarge.copy(color = Color.White)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Найди лучшее видео",
+                            style = MaterialTheme.typography.bodyMedium.copy(color = Color.LightGray)
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        SearchBar(
+                            query = searchQuery,
+                            onQueryChanged = {
+                                searchQuery = it
+                                onAction(VideoListAction.OnChangedText(it))
+                            },
+                            searchActive = true,
+                            onFocusChanged = {  },
+                            onBackClicked = { searchQuery = "" },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier
+                            .padding(paddingValues)
+                            .fillMaxSize(),
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (searchQuery.isNotEmpty()) {
+                            if (state.isFinding) {
+                                items(5) { VideoItemShimmer() }
+                            } else if (state.searchedVideos.isEmpty()) {
+                                item {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "Ничего не найдено",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = Color.LightGray
+                                        )
+                                    }
+                                }
+                            } else {
+                                items(state.searchedVideos) { video ->
+                                    VideoListItem(
+                                        video = video,
+                                        onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
                                     )
                                 }
                             }
                         } else {
-                            items(state.searchedVideos) { video ->
-                                VideoListItem(
-                                    video = video,
-                                    onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
-                                )
-                            }
-                        }
-                    } else {
-                        if (state.isLoading) {
-                            items(5) { VideoItemShimmer() }
-                        } else {
-                            items(state.topVideos) { video ->
-                                VideoListItem(
-                                    video = video,
-                                    onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
-                                )
+                            if (state.isLoading) {
+                                items(5) { VideoItemShimmer() }
+                            } else {
+                                items(state.topVideos) { video ->
+                                    VideoListItem(
+                                        video = video,
+                                        onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
+                                    )
+                                }
                             }
                         }
                     }
-                    item { Spacer(modifier = Modifier.height(16.dp)) }
+                }
+            } else {
+                Column(modifier = Modifier.fillMaxSize()) {
+                    CustomHeader(
+                        query = searchQuery,
+                        onQueryChanged = {
+                            searchQuery = it
+                            onAction(VideoListAction.OnChangedText(it))
+                        },
+                        onBackClicked = { searchQuery = "" },
+                        onFocusChanged = {  }
+                    )
+                    LazyColumn(
+                        modifier = Modifier
+                            .padding(paddingValues)
+                            .fillMaxSize(),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        if (searchQuery.isNotEmpty()) {
+                            if (state.isFinding) {
+                                items(5) { VideoItemShimmer() }
+                            } else if (state.searchedVideos.isEmpty()) {
+                                item {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 40.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "Ничего не найдено",
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = Color.LightGray
+                                        )
+                                    }
+                                }
+                            } else {
+                                items(state.searchedVideos) { video ->
+                                    VideoListItem(
+                                        video = video,
+                                        onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
+                                    )
+                                }
+                            }
+                        } else {
+                            if (state.isLoading) {
+                                items(5) { VideoItemShimmer() }
+                            } else {
+                                items(state.topVideos) { video ->
+                                    VideoListItem(
+                                        video = video,
+                                        onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
+                                    )
+                                }
+                            }
+                        }
+                        item { Spacer(modifier = Modifier.height(16.dp)) }
+                    }
                 }
             }
         }
@@ -203,10 +294,6 @@ fun SearchBar(
     modifier: Modifier = Modifier
 ) {
     val focusManager = LocalFocusManager.current
-    val animatedBorderColor by androidx.compose.animation.animateColorAsState(
-        targetValue = if (query.isNotEmpty()) Color(0xFFBB86FC) else Color.LightGray,
-        animationSpec = tween(durationMillis = 700)
-    )
 
     OutlinedTextField(
         value = query,
@@ -220,7 +307,7 @@ fun SearchBar(
         textStyle = TextStyle(color = Color.White, fontSize = 16.sp),
         leadingIcon = {
             if (query.isNotEmpty()) {
-                androidx.compose.material3.Icon(
+                Icon(
                     imageVector = Icons.Default.ArrowBack,
                     contentDescription = "Назад",
                     tint = Color.LightGray,
@@ -230,7 +317,7 @@ fun SearchBar(
                     }
                 )
             } else {
-                androidx.compose.material3.Icon(
+                Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = "Поиск",
                     tint = Color.LightGray
@@ -241,7 +328,7 @@ fun SearchBar(
         modifier = modifier.onFocusChanged { focusState ->
             onFocusChanged(focusState.isFocused)
         },
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(20.dp),
     )
 }
 
