@@ -54,6 +54,7 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.animateContentSize
 import androidx.media3.common.util.UnstableApi
+import com.cherenkov.videoapp.videoapp.presentation.reusable_components.ErrorMessage
 
 @Composable
 fun PlayerScreenRoot(
@@ -109,7 +110,7 @@ fun PlayerScreen(
         when {
             state.isLoading -> FullScreenLoading()
             state.errorMessage != null -> ErrorState(
-                error = state.errorMessage!!.asString(),
+                error = state.errorMessage.asString(),
                 onRetry = { onAction(PlayerAction.Retry) }
             )
             else -> {

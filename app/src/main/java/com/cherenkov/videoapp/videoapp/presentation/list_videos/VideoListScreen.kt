@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -60,7 +61,11 @@ import coil.compose.SubcomposeAsyncImage
 import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.cherenkov.videoapp.videoapp.domain.models.VideoItem
+import com.cherenkov.videoapp.videoapp.presentation.reusable_components.ErrorMessage
+import com.google.accompanist.swiperefresh.SwipeRefresh
+import com.google.accompanist.swiperefresh.rememberSwipeRefreshState
 import org.koin.androidx.compose.koinViewModel
+
 
 @Composable
 fun VideoListScreenRoot(
@@ -86,6 +91,9 @@ fun VideoListScreen(
     onAction: (VideoListAction) -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var isRefreshing by remember { mutableStateOf(false) }
+    val swipeRefreshState = rememberSwipeRefreshState(isRefreshing)
+
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -132,48 +140,56 @@ fun VideoListScreen(
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        modifier = Modifier
-                            .padding(paddingValues)
-                            .fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        if (searchQuery.isNotEmpty()) {
-                            if (state.isFinding) {
-                                items(5) { VideoItemShimmer() }
-                            } else if (state.searchedVideos.isEmpty()) {
-                                item {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "Ничего не найдено",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = Color.LightGray
+                    SwipeRefresh(
+                        state = swipeRefreshState,
+                        onRefresh = {
+                            onAction(VideoListAction.OnRefreshSwipe(searchQuery))
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    ){
+                        LazyVerticalGrid(
+                            columns = GridCells.Fixed(2),
+                            modifier = Modifier
+                                .padding(paddingValues)
+                                .fillMaxSize(),
+                            contentPadding = PaddingValues(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            if (searchQuery.isNotEmpty()) {
+                                if (state.isFinding) {
+                                    items(5) { VideoItemShimmer() }
+                                } else if (state.searchedVideos.isEmpty()) {
+                                    item {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "Ничего не найдено",
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = Color.LightGray
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    items(state.searchedVideos) { video ->
+                                        VideoListItem(
+                                            video = video,
+                                            onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
                                         )
                                     }
                                 }
                             } else {
-                                items(state.searchedVideos) { video ->
-                                    VideoListItem(
-                                        video = video,
-                                        onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
-                                    )
-                                }
-                            }
-                        } else {
-                            if (state.isLoading) {
-                                items(5) { VideoItemShimmer() }
-                            } else {
-                                items(state.topVideos) { video ->
-                                    VideoListItem(
-                                        video = video,
-                                        onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
-                                    )
+                                if (state.isLoading) {
+                                    items(5) { VideoItemShimmer() }
+                                } else {
+                                    items(state.topVideos) { video ->
+                                        VideoListItem(
+                                            video = video,
+                                            onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -190,53 +206,73 @@ fun VideoListScreen(
                         onBackClicked = { searchQuery = "" },
                         onFocusChanged = {  }
                     )
-                    LazyColumn(
-                        modifier = Modifier
-                            .padding(paddingValues)
-                            .fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        if (searchQuery.isNotEmpty()) {
-                            if (state.isFinding) {
-                                items(5) { VideoItemShimmer() }
-                            } else if (state.searchedVideos.isEmpty()) {
-                                item {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 40.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "Ничего не найдено",
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            color = Color.LightGray
+                    SwipeRefresh(
+                        state = swipeRefreshState,
+                        onRefresh = {
+                            onAction(VideoListAction.OnRefreshSwipe(searchQuery))
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    ){
+                        LazyColumn(
+                            modifier = Modifier
+                                .padding(paddingValues)
+                                .fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            if (searchQuery.isNotEmpty()) {
+                                if (state.isFinding) {
+                                    items(5) { VideoItemShimmer() }
+                                } else if (state.searchedVideos.isEmpty()) {
+                                    item {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 40.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = "Ничего не найдено",
+                                                style = MaterialTheme.typography.bodyLarge,
+                                                color = Color.LightGray
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    items(state.searchedVideos) { video ->
+                                        VideoListItem(
+                                            video = video,
+                                            onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
                                         )
                                     }
                                 }
                             } else {
-                                items(state.searchedVideos) { video ->
-                                    VideoListItem(
-                                        video = video,
-                                        onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
-                                    )
+                                if (state.isLoading) {
+                                    items(5) { VideoItemShimmer() }
+                                } else {
+                                    items(state.topVideos) { video ->
+                                        VideoListItem(
+                                            video = video,
+                                            onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
+                                        )
+                                    }
                                 }
                             }
-                        } else {
-                            if (state.isLoading) {
-                                items(5) { VideoItemShimmer() }
-                            } else {
-                                items(state.topVideos) { video ->
-                                    VideoListItem(
-                                        video = video,
-                                        onVideoClick = { onAction(VideoListAction.OnVideoClicked(it)) }
-                                    )
-                                }
-                            }
+                            item { Spacer(modifier = Modifier.height(16.dp)) }
                         }
-                        item { Spacer(modifier = Modifier.height(16.dp)) }
                     }
+                }
+            }
+            state.errorMessage?.let { uiText ->
+                Column(
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Spacer(Modifier.weight(1f))
+                    ErrorMessage(
+                        message = uiText.asString(),
+                        modifier = Modifier
+                            .systemBarsPadding()
+                    )
                 }
             }
         }

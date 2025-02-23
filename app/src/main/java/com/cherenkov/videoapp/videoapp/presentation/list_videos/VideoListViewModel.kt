@@ -35,6 +35,13 @@ class VideoListViewModel(
             is VideoListAction.OnChangedText -> {
                 searchVideos(text = action.text)
             }
+            is VideoListAction.OnRefreshSwipe -> {
+                if (action.query.isNotEmpty()) {
+                    searchVideos(text = action.query)
+                } else {
+                    searchPopularVideos()
+                }
+            }
             else -> Unit
         }
     }

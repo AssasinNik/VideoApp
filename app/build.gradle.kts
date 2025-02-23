@@ -67,8 +67,9 @@ dependencies {
     implementation(libs.jetbrains.compose.navigation)
 
     implementation(libs.androidx.core.splashscreen)
-
     implementation ("com.google.accompanist:accompanist-systemuicontroller:0.20.0")
+    implementation ("com.google.accompanist:accompanist-swiperefresh:0.28.0")
+
 
     implementation ("androidx.compose.animation:animation:1.7.8")
     implementation ("androidx.media3:media3-exoplayer:1.5.1")
