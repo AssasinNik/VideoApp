@@ -6,6 +6,7 @@ import androidx.room.TypeConverter
 
 @Database(
     entities = [VideoEntity::class],
+    exportSchema = false,
     version = 1
 )
 abstract class VideoDatabase: RoomDatabase() {
