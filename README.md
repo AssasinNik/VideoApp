@@ -44,6 +44,7 @@ graph TD
     B -->|Use Cases| C[Data Layer]
     C -->|Repository| D[Remote Data]
     C -->|Repository| E[Local Cache]
+```
 
 ## 📱 Скриншоты
 
