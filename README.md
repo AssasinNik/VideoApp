@@ -37,6 +37,7 @@
 
 ## 🏗 Архитектура
 
+```mermaid
 graph TD
     A[UI Layer] -->|Events| B[Domain Layer]
     B -->|State| A
