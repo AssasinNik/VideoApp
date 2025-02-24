@@ -6,6 +6,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -417,6 +418,32 @@ fun VideoListItem(
                             )
                         )
                 )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(8.dp)
+                        .background(
+                            color = Color.White.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.5f),
+                                    Color.White.copy(alpha = 0.1f)
+                                )
+                            ),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = video.duration.toString() + " sec",
+                        color = Color.White,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
             Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
@@ -428,7 +455,7 @@ fun VideoListItem(
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "Pexels Video",
+                    text = video.title,
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White,
                     maxLines = 2
@@ -437,6 +464,7 @@ fun VideoListItem(
         }
     }
 }
+
 
 @Composable
 fun VideoItemShimmer() {

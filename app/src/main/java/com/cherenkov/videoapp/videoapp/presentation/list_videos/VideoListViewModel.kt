@@ -39,7 +39,7 @@ class VideoListViewModel(
                 if (action.query.isNotEmpty()) {
                     searchVideos(text = action.query)
                 } else {
-                    searchPopularVideos()
+                    updatePopularVideos()
                 }
             }
             else -> Unit
@@ -67,6 +67,30 @@ class VideoListViewModel(
                 ) }
             }
     }
+
+    private fun updatePopularVideos() = viewModelScope.launch{
+        _state.update { it.copy(
+            isLoading = true
+        ) }
+        repository
+            .updateListVideos()
+            .onSuccess { result ->
+                _state.update { it.copy(
+                    isLoading = false,
+                    errorMessage = null,
+                    topVideos = result
+                ) }
+            }
+            .onError { error ->
+                _state.update { it.copy(
+                    topVideos = emptyList(),
+                    isLoading = false,
+                    errorMessage = error.toUiText()
+                ) }
+            }
+    }
+
+
 
     private fun searchVideos(text:String){
         searchJob?.cancel()

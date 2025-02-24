@@ -132,6 +132,7 @@ private fun FullScreenPlayer(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .navigationBarsPadding()
             .animateContentSize()
             .pointerInput(Unit) {
                 detectTapGestures(
@@ -176,6 +177,7 @@ private fun NonFullScreenPlayer(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .navigationBarsPadding()
             .animateContentSize()
     ) {
         Box(
@@ -230,7 +232,7 @@ fun VideoInfoPanel(videoInfo: VideoInfo?) {
             .padding(16.dp)
     ) {
         Text(
-            text = "Pexels Video",
+            text = videoInfo.title,
             style = MaterialTheme.typography.titleMedium.copy(color = Color.White)
         )
         Spacer(modifier = Modifier.height(8.dp))
@@ -284,13 +286,15 @@ private fun TopControlsBar(
                 modifier = Modifier.size(24.dp)
             )
         }
-        Text(
-            text = "Pexels Video",
-            color = Color.White,
-            style = MaterialTheme.typography.titleMedium,
-            maxLines = 1,
-            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-        )
+        state.playedVideo?.let {
+            Text(
+                text = it.title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+            )
+        }
         IconButton(
             onClick = {
                 onAction(
@@ -358,11 +362,13 @@ private fun YouTubeSeekBar(
                 color = Color.White,
                 style = MaterialTheme.typography.labelSmall
             )
-            Text(
-                text = state.totalDuration.toYouTubeTime(),
-                color = Color.White,
-                style = MaterialTheme.typography.labelSmall
-            )
+            state.playedVideo?.duration?.let {
+                Text(
+                    text = it,
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelSmall
+                )
+            }
         }
     }
 }
