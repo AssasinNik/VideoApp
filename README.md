@@ -48,7 +48,7 @@ graph TD
 
 | Главный экран | Видеоплеер | Адаптивный UI |
 |----------------|-------------|----------------|
-| ![Список](assets/main_vertical.jpg) | ![Плеер](assets/player_vertical.jpg) | ![Адаптив](sassets/player_horizontal.jpg) |
+| ![Список](assets/main_vertical.jpg) | ![Плеер](assets/player_vertical.jpg) | ![Адаптив](assets/player_horizontal.jpg) |
 
 Больше изображений в папке assets
 
