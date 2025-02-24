@@ -41,7 +41,7 @@
 graph TD
     A[UI Layer] -->|Events| B[Domain Layer]
     B -->|State| A
-    B -->|Use Cases| C[Data Layer]
+    B --> C[Data Layer]
     C -->|Repository| D[Remote Data]
     C -->|Repository| E[Local Cache]
 ```
